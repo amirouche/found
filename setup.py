@@ -24,7 +24,12 @@ setup(
     ],
     packages=find_packages(),
     package_data={'found': ['*.h']},
-    install_requires=["cffi>=1.0.0", "immutables", "six"],
+    install_requires=[
+        "cffi>=1.0.0",
+        "foundationdb==5.1.5",
+        "immutables==0.6",
+        "six==1.11.0"
+    ],
     setup_requires=["cffi>=1.0.0"],
     cffi_modules=["./found/build_found.py:ffi"],
 )

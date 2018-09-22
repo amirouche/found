@@ -29,7 +29,8 @@ import threading
 from enum import Enum
 from functools import wraps
 
-import found
+from fdb.impl import KeySelector
+
 from found._fdb import lib
 from found._fdb import ffi
 
@@ -79,40 +80,6 @@ def check(code):
         raise FoundError(code)
 
 
-def ensure_version():
-    if found.CURRENT_LOADED_VERSION is None:
-        # Configure the client API for the current CLIENT_VERSION
-        code = lib.fdb_select_api_version_impl(CLIENT_VERSION, CLIENT_VERSION)
-        if (
-            code == 2203
-        ):  # api_version_not_supported, but that's not helpful to the user
-            max_supported_ver = lib.fdb_get_max_api_version()
-            if CLIENT_VERSION > max_supported_ver:
-                msg = "This version of the FoundationDB Python binding is not supported by "
-                msg += "the installed FoundationDB C library. The binding requires a library "
-                msg += "that supports API version %d, but the installed library supports a "
-                msg += "maximum version of %d."
-                msg = msg % (CLIENT_VERSION, max_supported_ver)
-                raise RuntimeError(msg)
-            else:
-                msg = "API version %d is not supported by the installed FoundationDB C library."
-                msg = msg % CLIENT_VERSION
-                raise RuntimeError(msg)
-        elif code != 0:
-            raise RuntimeError("FoundationDB API error ({})".format(code))
-
-        found.CURRENT_LOADED_VERSION = CLIENT_VERSION
-        # set found.fdb to the parent module to easily access from layers the
-        # currently loaded version of the API
-        parent_module = sys.modules['.'.join(__name__.split('.')[:-1]) or '__main__']
-        found.fdb = parent_module
-        log.debug("found configured to use client API %s", CLIENT_VERSION)
-    elif found.CURRENT_LOADED_VERSION != CLIENT_VERSION:
-        msg = "found already loaded with for a different version "
-        raise RuntimeError(msg)
-    return True
-
-
 _network_thread = None
 _network_thread_reentrant_lock = threading.RLock()
 _loop = None
@@ -154,40 +121,6 @@ def _stop_network():
     if _network_thread:
         check(lib.fdb_stop_network())
         _network_thread.join()
-
-
-class KeySelector:
-    def __init__(self, key, or_equal, offset):
-        self.key = get_key(key)
-        self.or_equal = or_equal
-        self.offset = offset
-
-    def __add__(self, offset):
-        return KeySelector(self.key, self.or_equal, self.offset + offset)
-
-    def __sub__(self, offset):
-        return KeySelector(self.key, self.or_equal, self.offset - offset)
-
-    @classmethod
-    def last_less_than(cls, key):
-        return cls(key, False, 0)
-
-    @classmethod
-    def last_less_or_equal(cls, key):
-        return cls(key, True, 0)
-
-    @classmethod
-    def first_greater_than(cls, key):
-        return cls(key, True, 1)
-
-    @classmethod
-    def first_greater_or_equal(cls, key):
-        return cls(key, False, 1)
-
-    def __repr__(self):
-        msg = "<KeySelector key=%r or_equal=%r offset=%r>"
-        msg = msg % (self.key, self.or_equal, self.offset)
-        return msg
 
 
 class StreamingMode(Enum):
@@ -276,7 +209,7 @@ def on_transaction_get_range(fdb_future, aio_future):
         # total = count[0] * 2
         # free = on_transaction_get_range_free(fdb_future, total)
 
-        for kv in kvs[0][0 : count[0]]:
+        for kv in kvs[0][0:count[0]]:
             # XXX: manual unpacking because cffi doesn't known about packing
             # https://bitbucket.org/cffi/cffi/issues/364/make-packing-configureable
             memory = ffi.buffer(ffi.addressof(kv), 24)
@@ -569,8 +502,6 @@ async def open(cluster_file=None):
     """Open the database specified by `cluster_file` or the default
     cluster indicated by the fdb.cluster file in a platform-specific
     location. Initializes the FoundationDB interface as required"""
-
-    ensure_version()
 
     with _network_thread_reentrant_lock:
         if _network_thread is None:

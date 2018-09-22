@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from immutables import Map
 
-from found import fdb
+import found
 
 
 log = logging.getLogger(__name__)
@@ -59,69 +59,69 @@ class Sparky:
     def __init__(self, prefix):
         self._prefix = prefix
 
-    @fdb.transactional
+    @found.transactional
     async def uuid(self, tr):
         uid = uuid4()
-        key = fdb.pack((self._prefix, PREFIX_UUID, uid))
+        key = found.pack((self._prefix, PREFIX_UUID, uid))
         value = await tr.get(key)
         if value is None:
             tr.set(key, b"")
             return uid
         raise SparkyException("Unlikely Error!")
 
-    @fdb.transactional
+    @found.transactional
     async def all(self, tr):
-        start = fdb.pack((self._prefix, PREFIX_DATA))
-        end = fdb.strinc(start)
+        start = found.pack((self._prefix, PREFIX_DATA))
+        end = found.strinc(start)
         msg = "fetching everything between start=%r and end=%r"
         log.debug(msg, start, end)
         out = []
         items = await tr.range(start, end)
         for key, _ in items:  # value is always empty
-            _, _, subject, predicate, object = fdb.unpack(key)
+            _, _, subject, predicate, object = found.unpack(key)
             out.append((subject, predicate, object))
         return out
 
-    @fdb.transactional
+    @found.transactional
     async def add(self, tr, *triples):
         for triple in triples:
             subject, predicate, object = triple
             # add in 'spo' aka. data
-            key = fdb.pack((self._prefix, PREFIX_DATA, subject, predicate, object))
+            key = found.pack((self._prefix, PREFIX_DATA, subject, predicate, object))
             tr.set(key, b"")
             # index in 'pos'
-            key = fdb.pack((self._prefix, PREFIX_POS, predicate, object, subject))
+            key = found.pack((self._prefix, PREFIX_POS, predicate, object, subject))
             tr.set(key, b"")
 
-    @fdb.transactional
+    @found.transactional
     async def remove(self, tr, *triples):
         for triple in triples:
             subject, predicate, object = triple
             # remove from data
-            key = fdb.pack((self._prefix, PREFIX_DATA, subject, predicate, object))
+            key = found.pack((self._prefix, PREFIX_DATA, subject, predicate, object))
             tr.clear(key)
             # remove from index
-            key = fdb.pack((self._prefix, PREFIX_POS, predicate, object, subject))
+            key = found.pack((self._prefix, PREFIX_POS, predicate, object, subject))
             tr.clear(key)
 
-    @fdb.transactional
+    @found.transactional
     async def _lookup_pos(self, tr, predicate, object):
-        start = fdb.pack((self._prefix, PREFIX_POS, predicate, object))
-        end = fdb.strinc(start)
+        start = found.pack((self._prefix, PREFIX_POS, predicate, object))
+        end = found.strinc(start)
         items = await tr.range(start, end)
         out = list()
         for key, _ in items:
-            _, _, predicate, object, subject = fdb.unpack(key)
+            _, _, predicate, object, subject = found.unpack(key)
             out.append(subject)
         return out
 
-    @fdb.transactional
+    @found.transactional
     async def exists(self, tr, subject, predicate, object):
-        key = fdb.pack((self._prefix, PREFIX_DATA, subject, predicate, object))
+        key = found.pack((self._prefix, PREFIX_DATA, subject, predicate, object))
         value = await tr.get(key)
         return value is not None
 
-    @fdb.transactional
+    @found.transactional
     async def where(self, tr, pattern, *patterns):
         # seed bindings
         vars = tuple((isinstance(item, var) for item in pattern))
@@ -133,12 +133,12 @@ class Sparky:
         elif vars == (False, True, True):
             # TODO: extract to a method
             subject = pattern[0]
-            start = fdb.pack((self._prefix, PREFIX_DATA, subject))
-            end = fdb.strinc(start)
+            start = found.pack((self._prefix, PREFIX_DATA, subject))
+            end = found.strinc(start)
             items = await tr.range(start, end)
             bindings = []
             for key, _ in items:
-                _, _, _, predicate, object = fdb.unpack(key)
+                _, _, _, predicate, object = found.unpack(key)
                 binding = Map()
                 binding = binding.set(pattern[1].name, predicate)
                 binding = binding.set(pattern[2].name, object)
@@ -164,12 +164,12 @@ class Sparky:
                 elif vars == (False, False, True):
                     # TODO: extract to a method
                     subject, predicate, object = pattern
-                    start = fdb.pack((self._prefix, PREFIX_DATA, subject, predicate))
-                    end = fdb.strinc(start)
+                    start = found.pack((self._prefix, PREFIX_DATA, subject, predicate))
+                    end = found.strinc(start)
                     items = await tr.range(start, end)
                     bindings = []
                     for key, _ in items:
-                        _, _, _, _, value = fdb.unpack(key)
+                        _, _, _, _, value = found.unpack(key)
                         binding = binding.set(object.name, value)
                         next_bindings.append(binding)
                 elif vars == (True, False, False):
