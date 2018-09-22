@@ -9,15 +9,16 @@ asyncio drivers for foundationdb tested with CPython 3.5+
 
 .. code:: python
 
-    In [1]: import asyncio
-    In [2]: from found import v510 as fdb
-    In [3]: loop = asyncio.get_event_loop()
-    In [4]: db = loop.run_until_complete(fdb.open())
-    In [5]: tr = db._create_transaction()
-    In [6]: loop.run_until_complete(tr.get(b'hello'))
-    In [7]: tr.set(b'hello', b'world')
-    In [8]: loop.run_until_complete(tr.get(b'hello'))
-    Out[8]: b'world'
+	  In [1]: import found
+	  In [2]: import asyncio
+	  In [3]: found.api_version(510)
+	  In [4]: loop = asyncio.get_event_loop()
+	  In [5]: db = loop.run_until_complete(found.open())
+	  In [6]: tr = db._create_transaction()
+	  In [7]: loop.run_until_complete(tr.get(b'hello'))
+	  In [8]: tr.set(b'hello', b'world')
+	  In [9]: loop.run_until_complete(tr.get(b'hello'))
+	  Out[9]: b'world'
 
 Also ``@transactional`` is also supported.
 
