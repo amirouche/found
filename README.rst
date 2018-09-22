@@ -1,5 +1,5 @@
-python-found
-############
+asyncio-foundationdb
+####################
 
 .. image:: https://api.travis-ci.org/amirouche/found.svg?branch=master
 
@@ -26,7 +26,7 @@ Getting started
 
 ::
 
-   pip install python-found
+   pip install asyncio-foundationdb
 
 Differences with ``fdb``
 ========================

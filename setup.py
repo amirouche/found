@@ -4,19 +4,18 @@ import os
 import sys
 
 from setuptools import setup, find_packages
+from found import VERSION
 
 
 os.chdir(os.path.dirname(sys.argv[0]) or ".")
 
-from found import VERSION
-
 
 setup(
-    name="python-found",
+    name="asyncio-foundationdb",
     version=VERSION,
     description="asyncio drivers for FoundationDB",
     long_description=open("README.rst", "rt").read(),
-    url="https://github.com/amirouche/found/",
+    url="https://github.com/amirouche/asyncio-foundationdb/",
     author="Amirouche BOUBEKKI",
     author_email="amirouche.boubekki@gmail.com",
     classifiers=[
