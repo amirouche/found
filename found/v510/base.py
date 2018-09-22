@@ -300,7 +300,6 @@ def on_transaction_get_range(fdb_future, aio_future):
 
 
 def get_key(obj):
-    # XXX: not sure this as_foundationdb_key is really needed/useful
     try:
         key = obj.as_foundationdb_key()
     except AttributeError:
@@ -310,7 +309,6 @@ def get_key(obj):
 
 
 def get_value(obj):
-    # Same as above
     try:
         value = obj.as_foundationdb_value()
     except AttributeError:
