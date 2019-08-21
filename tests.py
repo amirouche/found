@@ -170,180 +170,215 @@ async def test_transactional():
 
 
 @pytest.mark.asyncio
-async def test_sparky_empty():
+async def test_nstore_empty():
     db = await open()
-    from found.sparky import Sparky
+    from found.nstore import NStore
 
-    sparky = Sparky(b"test-sparky")
-    tuples = await sparky.all(db)
-    assert tuples == []
+    nstore = NStore("test-name", [42], ("subject", "predicate", "object"))
 
 
 @pytest.mark.asyncio
-async def test_sparky_one_tuple():
+async def test_simple_single_item_db_subject_lookup():
     db = await open()
-    from found.sparky import Sparky
+    from found.nstore import NStore
+    from found.nstore import var
 
-    sparky = Sparky(b"test-sparky")
-    expected = (2, 3, 4)
-    await sparky.add(db, expected)
-    tuples = await sparky.all(db)
-    assert tuples == [expected]
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
+
+    expected = uuid4()
+    await triplestore.add(db, expected, "title", "hyper.dev")
+    out = []
+    async for item in triplestore.select(db, var("subject"), "title", "hyper.dev"):
+        out.append(item)
+    out = out[0]["subject"]
+    assert out == expected
 
 
 @pytest.mark.asyncio
-async def test_sparky_many_tuples():
+async def test_ask_rm_and_ask():
     db = await open()
-    from found.sparky import Sparky
+    from found.nstore import NStore
+    from found.nstore import var
 
-    sparky = Sparky(b"test-sparky")
-    expected = [(1, 2, 3), (1, 9, 8), (1, 3, 3)]
-    expected.sort()  # XXX: sparky keeps ordering
-    await sparky.add(db, *expected)
-    tuples = await sparky.all(db)
-    assert tuples == expected
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
+
+    expected = uuid4()
+    await triplestore.add(db, expected, "title", "hyper.dev")
+    out = await triplestore.ask(db, expected, "title", "hyper.dev")
+    assert out
+    await triplestore.remove(db, expected, "title", "hyper.dev")
+    out = await triplestore.ask(db, expected, "title", "hyper.dev")
+    assert not out
 
 
 @pytest.mark.asyncio
-async def test_sparky_where_one_pattern():
+async def test_simple_multiple_items_db_subject_lookup():
     db = await open()
-    from found.sparky import Sparky
-    from found.sparky import var
+    from found.nstore import NStore
+    from found.nstore import var
 
-    sparky = Sparky(b"test-sparky")
-    data = [
-        ("uid1", "title", "sparky"),
-        ("uid1", "description", "rdf / sparql for humans"),
-        ("uid2", "title", "hyperdev.fr"),
-        ("uid2", "descrption", "forward and beyond!"),
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
+
+    expected = uuid4()
+    await triplestore.add(db, expected, "title", "hyper.dev")
+    await triplestore.add(db, uuid4(), "title", "blog.dolead.com")
+    await triplestore.add(db, uuid4(), "title", "julien.danjou.info")
+    out = []
+    async for item in triplestore.select(db, var("subject"), "title", "hyper.dev"):
+        out.append(item)
+    out = out[0]["subject"]
+    assert out == expected
+
+
+@pytest.mark.asyncio
+async def test_complex():
+    db = await open()
+    from found.nstore import NStore
+    from found.nstore import var
+
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
+
+    hyperdev = uuid4()
+    await triplestore.add(db, hyperdev, "title", "hyper.dev")
+    await triplestore.add(db, hyperdev, "keyword", "scheme")
+    await triplestore.add(db, hyperdev, "keyword", "hacker")
+    dolead = uuid4()
+    await triplestore.add(db, dolead, "title", "blog.dolead.com")
+    await triplestore.add(db, dolead, "keyword", "corporate")
+    julien = uuid4()
+    await triplestore.add(db, julien, "title", "julien.danjou.info")
+    await triplestore.add(db, julien, "keyword", "python")
+    await triplestore.add(db, julien, "keyword", "hacker")
+
+    seed = triplestore.select(db, var("identifier"), "keyword", "hacker")
+    out = []
+    async for item in triplestore.where(
+        db, seed, var("identifier"), "title", var("blog")
+    ):
+        out.append(item)
+    out = sorted([x["blog"] for x in out])
+    assert out == ["hyper.dev", "julien.danjou.info"]
+
+
+@pytest.mark.asyncio
+async def test_seed_subject_variable():
+    db = await open()
+    from found.nstore import NStore
+    from found.nstore import var
+
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
+
+    hyperdev = uuid4()
+    await triplestore.add(db, hyperdev, "title", "hyper.dev")
+    await triplestore.add(db, hyperdev, "keyword", "scheme")
+    await triplestore.add(db, hyperdev, "keyword", "hacker")
+
+    dolead = uuid4()
+    await triplestore.add(db, dolead, "title", "blog.dolead.com")
+    await triplestore.add(db, dolead, "keyword", "corporate")
+
+    julien = uuid4()
+    await triplestore.add(db, julien, "title", "julien.danjou.info")
+    await triplestore.add(db, julien, "keyword", "python")
+    await triplestore.add(db, julien, "keyword", "hacker")
+
+    out = []
+    async for item in triplestore.select(db, var("subject"), "keyword", "corporate"):
+        out.append(item)
+    out = out[0]["subject"]
+
+    assert out == dolead
+
+
+@pytest.mark.asyncio
+async def test_seed_subject_lookup():
+    db = await open()
+    from found.nstore import NStore
+    from found.nstore import var
+
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
+
+    hyperdev = uuid4()
+    await triplestore.add(db, hyperdev, "title", "hyper.dev")
+    await triplestore.add(db, hyperdev, "keyword", "scheme")
+    await triplestore.add(db, hyperdev, "keyword", "hacker")
+
+    dolead = uuid4()
+    await triplestore.add(db, dolead, "title", "blog.dolead.com")
+    await triplestore.add(db, dolead, "keyword", "corporate")
+
+    julien = uuid4()
+    await triplestore.add(db, julien, "title", "julien.danjou.info")
+    await triplestore.add(db, julien, "keyword", "python")
+    await triplestore.add(db, julien, "keyword", "hacker")
+
+    out = []
+    async for item in triplestore.select(db, dolead, var("key"), var("value")):
+        out.append(item)
+    out = [dict(x) for x in out]
+
+    expected = [
+        {"key": "keyword", "value": "corporate"},
+        {"key": "title", "value": "blog.dolead.com"},
     ]
-    await sparky.add(db, *data)
-    out = await sparky.where(db, ("uid1", var("key"), var("value")))
-    out = [dict(x.items()) for x in out]
-    assert out == [
-        {"key": "description", "value": "rdf / sparql for humans"},
-        {"key": "title", "value": "sparky"},
-    ]
+    assert out == expected
 
 
 @pytest.mark.asyncio
-async def test_sparky_where_several_pattern():
+async def test_seed_object_variable():
     db = await open()
-    from found.sparky import Sparky
-    from found.sparky import var
+    from found.nstore import NStore
+    from found.nstore import var
 
-    sparky = Sparky(b"test-sparky")
-    data = [
-        ("uid1", "title", "sparky"),
-        ("uid1", "description", "rdf / sparql for humans"),
-        ("uid3", "blog", "uid1"),
-        ("uid3", "title", "sparky query language"),
-        ("uid2", "title", "hyperdev.fr"),
-        ("uid2", "descrption", "forward and beyond!"),
-    ]
-    await sparky.add(db, *data)
-    patterns = [
-        (var("blog"), "title", "sparky"),
-        (var("post"), "blog", var("blog")),
-        (var("post"), "title", var("title")),
-    ]
-    out = await sparky.where(db, *patterns)
-    out = [dict(x.items()) for x in out]
-    assert out == [{"blog": "uid1", "post": "uid3", "title": "sparky query language"}]
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
+
+    hyperdev = uuid4()
+    await triplestore.add(db, hyperdev, "title", "hyper.dev")
+    await triplestore.add(db, hyperdev, "keyword", "scheme")
+    await triplestore.add(db, hyperdev, "keyword", "hacker")
+
+    dolead = uuid4()
+    await triplestore.add(db, dolead, "title", "blog.dolead.com")
+    await triplestore.add(db, dolead, "keyword", "corporate")
+
+    julien = uuid4()
+    await triplestore.add(db, julien, "title", "julien.danjou.info")
+    await triplestore.add(db, julien, "keyword", "python")
+    await triplestore.add(db, julien, "keyword", "hacker")
+
+    out = []
+    async for item in triplestore.select(db, hyperdev, "title", var("title")):
+        out.append(item)
+
+    out = out[0]["title"]
+    assert out == "hyper.dev"
 
 
 @pytest.mark.asyncio
-async def test_sparky_stuff():
+async def test_subject_variable():
     db = await open()
-    from found.sparky import Sparky
-    from found.sparky import var
+    from found.nstore import NStore
+    from found.nstore import var
 
-    sparky = Sparky(b"test-sparky")
-    tuples = [
-        # abki
-        ("74c69c2adfef4648b286b720c69a334b", "is a", "user"),
-        ("74c69c2adfef4648b286b720c69a334b", "name", "abki"),
-        # amz31
-        ("f1e18a79a9564018b2cccef24911e931", "is a", "user"),
-        ("f1e18a79a9564018b2cccef24911e931", "name", "amz31"),
-        # abki says poor man social network
-        ("78ad80d0cb7e4975acb1f222c960901d", "created-at", 1536859544),
-        ("78ad80d0cb7e4975acb1f222c960901d", "expression", "poor man social network"),
-        (
-            "78ad80d0cb7e4975acb1f222c960901d",
-            "html",
-            "<p>poor man social network</p>\n",
-        ),
-        ("78ad80d0cb7e4975acb1f222c960901d", "modified-at", 1536859544),
-        (
-            "78ad80d0cb7e4975acb1f222c960901d",
-            "actor",
-            "74c69c2adfef4648b286b720c69a334b",
-        ),
-        # amz31 follow abki
-        (
-            "d563fd7cdbd84c449d36f1e6cf5893a3",
-            "followee",
-            "74c69c2adfef4648b286b720c69a334b",
-        ),  # noqa
-        (
-            "d563fd7cdbd84c449d36f1e6cf5893a3",
-            "follower",
-            "f1e18a79a9564018b2cccef24911e931",
-        ),  # noqa
-        # abki says socialite for the win
-        ("fe066559ce894d9caf2bca63c42d98a8", "created-at", 1536859522),
-        ("fe066559ce894d9caf2bca63c42d98a8", "expression", "socialite for the win!"),
-        ("fe066559ce894d9caf2bca63c42d98a8", "html", "<p>socialite for the win!</p>\n"),
-        ("fe066559ce894d9caf2bca63c42d98a8", "modified-at", 1536859522),
-        (
-            "fe066559ce894d9caf2bca63c42d98a8",
-            "actor",
-            "74c69c2adfef4648b286b720c69a334b",
-        ),
-    ]
-    await sparky.add(db, *tuples)
-    everything = await sparky.all(db)
-    assert len(everything) == len(tuples)
+    triplestore = NStore("test-name", [42], ("subject", "predicate", "object"))
 
-    user = "f1e18a79a9564018b2cccef24911e931"
-    patterns = (
-        (var("follow"), "follower", user),
-        (var("follow"), "followee", var("followee")),
-        (var("expression"), "actor", var("followee")),
-        (var("expression"), "html", var("html")),
-        (var("expression"), "modified-at", var("modified-at")),
-        (var("followee"), "name", var("name")),
-    )
-    out = await sparky.where(db, *patterns)
-    out.sort(key=lambda x: x["modified-at"], reverse=True)
-    assert len(out) == 2
-    assert [b["expression"] for b in out] == [
-        "78ad80d0cb7e4975acb1f222c960901d",
-        "fe066559ce894d9caf2bca63c42d98a8",
-    ]  # noqa
-
-
-@pytest.mark.asyncio
-async def test_multiple_seeds():
     # prepare
-    db = await open()
-    from found.sparky import Sparky
-    from found.sparky import var
+    hyperdev = uuid4()
+    await triplestore.add(db, hyperdev, "title", "hyper.dev")
+    await triplestore.add(db, hyperdev, "keyword", "scheme")
+    await triplestore.add(db, hyperdev, "keyword", "hacker")
+    post1 = uuid4()
+    await triplestore.add(db, post1, "blog", hyperdev)
+    await triplestore.add(db, post1, "title", "hoply is awesome")
+    post2 = uuid4()
+    await triplestore.add(db, post2, "blog", hyperdev)
+    await triplestore.add(db, post2, "title", "hoply triple store")
 
-    sparky = Sparky(b"test-sparky")
-    tuples = [
-        ("seed0", "name", "abki"),
-        ("seed1", "name", "abki"),
-        ("zero", "number", "seed0"),
-        ("one", "number", "seed1"),
-    ]
-    await sparky.add(db, *tuples)
-    # exec
-    patterns = (
-        (var('seed'), "name", "abki"),
-        (var('number'), "number", var("seed")),
-    )
-    out = await sparky.where(db, *patterns)
-    # check
-    assert ["zero", "one"] == [o["number"] for o in out]
+    # exec, fetch all blog title from hyper.dev
+    query = triplestore.select(db, var("blog"), "title", "hyper.dev")
+    query = triplestore.where(db, query, var("post"), "blog", var("blog"))
+    out = []
+    async for item in triplestore.where(db, query, var("post"), "title", var("title")):
+        out.append(item)
+    out = sorted([x["title"] for x in out])
+    assert out == ["hoply is awesome", "hoply triple store"]
