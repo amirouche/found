@@ -67,7 +67,7 @@ class FoundError(FoundException):
 
 
 def strinc(key):
-    # TODO: I am not sure what this function is doing.
+    """Compute the smallest key that does not start with key"""
     key = key.rstrip(b"\xff")
     if len(key) == 0:
         raise ValueError("Key must contain at least one byte not equal to 0xFF.")
