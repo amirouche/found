@@ -4,7 +4,7 @@
 # see https://github.com/amirouche/asyncio-foundationdb
 #
 # Copyright 2013-2018 Apple Inc. and the FoundationDB project authors
-# Copyright 2018 Amirouche Boubekki <amirouche@hypermove.net>
+# Copyright 2018-2019 Amirouche Boubekki <amirouche@hyper.dev>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -468,6 +468,8 @@ class Transaction(BaseTransaction):
 
 
 def transactional(func):
+    # TODO: check func is async
+
     spec = inspect.getfullargspec(func)
     try:
         # XXX: hardcode transaction name
