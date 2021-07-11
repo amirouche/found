@@ -29,13 +29,43 @@ from enum import Enum
 from functools import wraps
 from collections import defaultdict
 
-from fdb.impl import KeySelector
-
 from found._fdb import lib
 from found._fdb import ffi
 
 
 log = logging.getLogger(__name__)
+
+
+class KeySelector(object):
+    def __init__(self, key, or_equal, offset):
+        self.key = key
+        self.or_equal = or_equal
+        self.offset = offset
+
+    def __add__(self, offset):
+        return KeySelector(self.key, self.or_equal, self.offset + offset)
+
+    def __sub__(self, offset):
+        return KeySelector(self.key, self.or_equal, self.offset - offset)
+
+    @classmethod
+    def last_less_than(cls, key):
+        return cls(key, False, 0)
+
+    @classmethod
+    def last_less_or_equal(cls, key):
+        return cls(key, True, 0)
+
+    @classmethod
+    def first_greater_than(cls, key):
+        return cls(key, True, 1)
+
+    @classmethod
+    def first_greater_or_equal(cls, key):
+        return cls(key, False, 1)
+
+    def __repr__(self):
+        return 'KeySelector(%r, %r, %r)' % (self.key, self.or_equal, self.offset)
 
 
 class BaseFound:
